@@ -24,3 +24,10 @@ OWASP LLM Top 10
 3. Run tests: `npx promptfoo run redteam/promptfoo.yml`
 4. If you want a report: `npx promptfoo run redteam/promptfoo.yml --reporter junit`
 
+## CI/CD Integration
+A GitHub Actions workflow is configured in `.github/workflows/promptfoo-ci.yml`.
+- Builds the Spring Boot app with Maven
+- Builds and starts the Docker container
+- Runs promptfoo test suite from `redteam/promptfoo.yml`
+- Uploads `promptfoo-report.xml` as an artifact
+
