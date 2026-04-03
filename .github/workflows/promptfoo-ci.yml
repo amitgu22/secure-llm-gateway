@@ -1,0 +1,66 @@
+name: Promptfoo Red Team
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  redteam:
+    runs-on: ubuntu-latest
+    env:
+      APP_HOST: http://localhost:8080
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Build Java app with Maven
+        run: mvn -B -DskipTests clean package
+
+      - name: Build Docker image
+        run: docker build -t secure-llm .
+
+      - name: Start app container in background
+        run: |
+          docker run --rm -d --name secure-llm -p 8080:8080 secure-llm
+          echo "Waiting for app to be ready..."
+          for i in {1..30}; do
+            if curl --silent --fail $APP_HOST/actuator/health; then
+              echo "App is online";
+              exit 0;
+            fi;
+            sleep 2;
+          done;
+          echo "App did not start in time";
+          docker logs secure-llm || true;
+          exit 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install promptfoo CLI
+        run: npm install -g @promptfoo/cli
+
+      - name: Run Promptfoo tests
+        run: |
+          npx promptfoo run redteam/promptfoo.yml --reporter junit --reporter-options output=promptfoo-report.xml
+        continue-on-error: false
+
+      - name: Archive Promptfoo results
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptfoo-report
+          path: promptfoo-report.xml
+
+      - name: Stop app container
+        if: always()
+        run: docker container stop secure-llm || true
